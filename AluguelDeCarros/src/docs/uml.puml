@@ -1,0 +1,147 @@
+@startuml
+top to bottom direction
+skinparam classAttributeIconSize 0
+
+abstract class Usuario {
+    - id: Long
+    - usuario: String
+    - senhaHash: String
+    - ativo: boolean
+    + desativar(): void
+}
+
+class Cliente {
+    - rg: String
+    - cpf: String
+    - nome: String
+    - endereco: String
+    - profissao: String
+    - vinculosRenda: List<VinculoRenda>
+    + adicionarVinculoRenda(vinculo: VinculoRenda): void
+    + removerVinculoRenda(vinculo: VinculoRenda): void
+    + getVinculosRenda(): List<VinculoRenda>
+}
+
+class Agente {
+    - nome: String
+    - cnpj: String
+    - tipo: TipoAgente
+}
+
+enum TipoAgente {
+    EMPRESA
+    BANCO
+}
+
+class VinculoRenda {
+    - id: Long
+    - entidadeEmpregadora: String
+    - rendimento: BigDecimal
+    - cliente: Cliente
+}
+
+class Automovel {
+    - id: Long
+    - matricula: String
+    - ano: int
+    - marca: String
+    - modelo: String
+    - placa: String
+}
+
+class PedidoAluguel {
+    - id: Long
+    - dataCriacao: LocalDateTime
+    - dataInicio: LocalDate
+    - dataFim: LocalDate
+    - status: StatusPedido
+}
+
+enum StatusPedido {
+    EM_ANALISE
+    APROVADO
+    REPROVADO
+    CANCELADO
+    CONTRATADO
+}
+
+class AvaliacaoFinanceira {
+    - id: Long
+    - dataAvaliacao: LocalDateTime
+    - parecer: String
+    - aprovada: boolean
+}
+
+class ContratoAluguel {
+    - id: Long
+    - dataCelebracao: LocalDate
+    - valor: double
+}
+
+class ContratoCredito {
+    - id: Long
+    - valor: BigDecimal
+    - quantidadeParcelas: Integer
+}
+
+note left of Usuario
+    Herança JPA JOINED.
+    usuarios centraliza o login único.
+    clientes compartilha a PK de usuarios.
+    Conta desativada por ativo = false.
+end note
+
+note left of VinculoRenda
+    Associação bidirecional LAZY.
+    Coleção exposta somente para leitura.
+    Até três vínculos pelos métodos do domínio.
+    orphanRemoval remove vínculos retirados.
+end note
+
+Usuario <|-- Cliente
+Usuario <|-- Agente
+
+Agente --> TipoAgente
+PedidoAluguel --> StatusPedido
+
+Cliente "1" *-- "0..3" VinculoRenda : possui
+Cliente "1" -- "0..*" PedidoAluguel : solicita
+Automovel "1" -- "0..*" PedidoAluguel : solicitado em
+
+PedidoAluguel "1" -- "0..1" AvaliacaoFinanceira : recebe
+Agente "1" -- "0..*" AvaliacaoFinanceira : realiza
+
+PedidoAluguel "1" -- "0..1" ContratoAluguel : origina
+Agente "1" -- "0..*" ContratoAluguel : registra
+
+ContratoAluguel "1" -- "0..1" ContratoCredito : pode possuir
+Agente "1" -- "0..*" ContratoCredito : concede
+
+Cliente "0..1" -- "0..*" Automovel : proprietário
+Agente "0..1" -- "0..*" Automovel : proprietário
+
+note right of Agente
+    Representa a conta de uma empresa
+    ou de um banco participante.
+end note
+
+note right of Automovel
+    Cada automóvel deve possuir exatamente
+    um proprietário: Cliente ou Agente.
+    As duas associações são exclusivas.
+end note
+
+note right of PedidoAluguel
+    Apenas pedidos aprovados podem
+    originar contratos de aluguel.
+
+    Cada pedido terá, nesta versão,
+    no máximo uma avaliação conclusiva.
+end note
+
+note right of ContratoCredito
+    O agente concedente deve
+    possuir o tipo BANCO.
+end note
+
+@enduml

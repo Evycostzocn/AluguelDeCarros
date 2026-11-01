@@ -1,0 +1,55 @@
+@startuml
+top to bottom direction
+skinparam packageStyle rectangle
+
+package "Front-end — React + Vite" {
+    package "pages" as pages
+    package "components" as components
+    package "services — cliente HTTP" as frontendServices
+
+    pages ..> components : utiliza
+    pages ..> frontendServices : solicita operações
+}
+
+package "Back-end — Spring Boot" {
+    package "controller" as controller
+    package "service" as service
+    package "repository" as repository
+    package "model" as model
+    package "dto" as dto
+    package "config" as config
+
+    controller ..> service : delega operações
+    controller ..> dto : recebe e retorna dados
+
+    service ..> repository : consulta e persiste
+    service ..> model : aplica regras
+    service ..> dto : transforma dados
+
+    repository ..> model : persiste entidades
+    config ..> service : configura autenticação
+}
+
+database "Supabase\nPostgreSQL" as database
+
+frontendServices ..> controller : HTTP / JSON
+repository ..> database : acesso aos dados
+
+note bottom of controller
+    Controller: recebe requisições HTTP.
+    Service: executa regras de negócio.
+    Repository: acessa o banco de dados.
+    Model: representa entidades do domínio.
+    DTO: define os dados de entrada e saída.
+    Config: reúne configurações da aplicação.
+end note
+
+note bottom of pages
+    O React representa a camada
+    de apresentação da aplicação.
+
+    O back-end expõe os dados
+    por uma API REST.
+end note
+
+@enduml

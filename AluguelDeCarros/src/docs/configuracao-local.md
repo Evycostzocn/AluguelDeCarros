@@ -47,7 +47,7 @@ versione credenciais ou inclua segredos em capturas e relatórios.
 No mesmo terminal, com as variáveis exportadas:
 
 ```bash
-bash ./mvnw verify
+bash ./mvnw clean verify
 bash ./mvnw spring-boot:run
 ```
 
@@ -80,8 +80,8 @@ unset DB_URL DB_USERNAME DB_PASSWORD
 - A URL JDBC deve incluir `sslmode=require`. O datasource também define esse
   modo SSL; não use parâmetros SSL conflitantes na URL.
 - O Hikari permite no máximo cinco conexões por instância da aplicação.
-- `spring.jpa.hibernate.ddl-auto=none` impede a geração automática de tabelas
-  pelo Hibernate nesta etapa.
+- `spring.jpa.hibernate.ddl-auto=validate` valida as entidades contra o schema
+  criado pelo Flyway; Hibernate não cria nem atualiza tabelas.
 - `spring.jpa.open-in-view=false` desativa Open EntityManager in View.
 - O Hibernate detecta o dialect pela conexão, sem configuração manual.
 - Variáveis ausentes: exporte as três no processo correto.
@@ -91,4 +91,88 @@ unset DB_URL DB_USERNAME DB_PASSWORD
 - Falha de download Maven pode impedir as verificações antes de tentar conectar
   ao banco; confira o acesso ao Maven Central.
 
-Esta etapa não cria tabelas, entidades ou funcionalidades de negócio.
+## Entidades e migrações
+
+A primeira parte do domínio está em `com.example.AluguelDeCarros.model`:
+`Usuario` abstrato, `Cliente` e `VinculoRenda`. A herança é JOINED: `usuarios`
+centraliza ID identity, login único, hash e conta ativa; `clientes.id` é PK e FK
+para `usuarios.id`. CPF é String com exatamente 11 dígitos, sem pontuação;
+a validação de formato **não verifica os dígitos verificadores**. Os campos
+obrigatórios possuem Bean Validation e restrições SQL. Não há hashing nesta
+etapa: o construtor recebe somente um hash já produzido pela futura autenticação.
+O hash não tem getter e é ignorado pelo Jackson. Entidades não serão contratos
+HTTP; a futura API deverá usar DTOs.
+
+`vinculos_renda` tem ID identity, FK obrigatória para clientes, empregador e
+rendimento `NUMERIC(15,2)` positivo (13 dígitos inteiros, duas casas decimais).
+O domínio usa BigDecimal e Bean Validation. As validações de campos são
+executadas pelo Jakarta Validation no ciclo de persistência, não automaticamente
+pela chamada dos construtores. Um vínculo recém-criado deve ser adicionado a um
+cliente antes de persistir.
+
+`Cliente.adicionarVinculoRenda` verifica proprietário e limite antes de alterar
+os dois lados. Adicionar novamente a mesma instância é idempotente; adicionar
+um quarto lança exceção sem alterar a coleção. A coleção é inicializada,
+somente leitura para consumidores e não possui setter. Os métodos internos de
+associação são restritos ao pacote model. As duas associações são LAZY; a
+coleção propaga PERSIST/MERGE e usa orphanRemoval. Remover um vínculo sincroniza
+os lados e exclui esse vínculo no flush. Não reutilize um vínculo persistido
+removido em outro cliente: crie outro, respeitando esse ciclo de vida.
+Não há equals/hashCode customizados ou comparação por IDs ainda não gerados.
+
+O limite de três é uma regra do domínio, complementada por `@Size(max=3)`;
+**não protege sozinho contra SQL direto ou transações concorrentes**. A futura
+camada transacional precisará coordenar alterações concorrentes (por exemplo,
+bloqueio do cliente); esta migração não implementa trigger de contagem.
+`desativar()` muda `ativo` para false. Não há operação de exclusão física de
+clientes; JPA por si só não impede que código futuro execute uma remoção indevida.
+
+Não havia ferramenta de migração. Foram adicionados `spring-boot-starter-flyway`
+e `flyway-database-postgresql`, gerenciados pelo Spring Boot. Na inicialização
+(inclusive do teste de contexto), Flyway aplica
+`db/migration/V1__cria_usuarios_clientes_vinculos_renda.sql`, antes da validação
+Hibernate. A migração cria as três tabelas, PKs, FKs, unicidade de login e CPF,
+checks de campos e rendimento e índice na FK de vínculos. Apenas `public` é
+configurado; schemas internos como `auth` não são alterados.
+
+`clean-disabled=true`, `baseline-on-migrate=false` e `create-schemas=false`
+evita limpeza ou baseline automáticos. Não execute Flyway clean, não use
+`ddl-auto=update`/`create-drop` e não edite V1 depois de aplicada; mudanças futuras
+exigem V2, V3 etc. O comando **Maven** `clean` abaixo limpa apenas os artefatos
+locais de build (`target`), não o banco.
+
+Se `public` já tiver objetos sem histórico Flyway, a migração pode ser recusada.
+Pare e investigue os objetos e o histórico, sem apagar dados nem habilitar
+baseline para contornar o conflito. Não se usa `IF NOT EXISTS` para ocultar
+incompatibilidades. A execução inicial cria estrutura persistente no banco.
+
+### Validação desta etapa
+
+Sem credenciais, execute somente os testes independentes do banco:
+
+```bash
+bash ./mvnw -Dtest=ClienteTest,ValidacaoEntidadesTest test
+```
+
+Esse comando seleciona explicitamente os testes unitários e não substitui a
+verificação completa. Com as três variáveis exportadas no mesmo terminal:
+
+```bash
+bash ./mvnw clean verify
+bash ./mvnw spring-boot:run
+```
+
+Verifique sucesso da migração V1 no log do Flyway, inicialização do
+EntityManagerFactory sem erros de schema e o resultado dos testes. No SQL Editor
+do Supabase, uma conferência somente leitura do histórico é:
+
+```sql
+SELECT version, description, success
+FROM public.flyway_schema_history
+ORDER BY installed_rank;
+```
+
+Na implementação desta etapa, as variáveis não estavam disponíveis no processo
+do assistente. A migração e a compatibilidade com o Supabase ainda precisam ser
+validadas com esses comandos, mesmo que a conexão da etapa anterior já tenha
+sido validada. Não compartilhe credenciais ou logs contendo segredos.

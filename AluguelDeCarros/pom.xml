@@ -30,6 +30,16 @@
 		<java.version>25</java.version>
 	</properties>
 	<dependencies>
+        <!-- Migrações versionadas, com versões gerenciadas pelo Spring Boot -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
 		<!-- API REST com Spring MVC -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
