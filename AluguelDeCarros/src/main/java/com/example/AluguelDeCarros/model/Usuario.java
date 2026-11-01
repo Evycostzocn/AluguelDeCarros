@@ -36,6 +36,9 @@ public abstract class Usuario {
         this.senhaHash = senhaHash;
     }
 
+    @JsonIgnore
+    public String getSenhaHash() { return senhaHash; }
+
     public Long getId() { return id; }
     public String getUsuario() { return usuario; }
     public boolean isAtivo() { return ativo; }

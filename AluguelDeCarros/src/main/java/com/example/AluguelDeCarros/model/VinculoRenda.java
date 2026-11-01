@@ -39,6 +39,11 @@ public class VinculoRenda {
         this.rendimento = rendimento;
     }
 
+    public void atualizar(String entidadeEmpregadora, BigDecimal rendimento) {
+        this.entidadeEmpregadora = entidadeEmpregadora;
+        this.rendimento = rendimento;
+    }
+
     public Long getId() { return id; }
     public String getEntidadeEmpregadora() { return entidadeEmpregadora; }
     public BigDecimal getRendimento() { return rendimento; }

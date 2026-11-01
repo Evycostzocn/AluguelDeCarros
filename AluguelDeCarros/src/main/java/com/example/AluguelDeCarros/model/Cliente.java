@@ -57,6 +57,11 @@ public class Cliente extends Usuario {
         this.profissao = profissao;
     }
 
+    public void atualizar(String rg, String cpf, String nome, String endereco, String profissao) {
+        this.rg = rg; this.cpf = cpf; this.nome = nome;
+        this.endereco = endereco; this.profissao = profissao;
+    }
+
     public String getRg() { return rg; }
     public String getCpf() { return cpf; }
     public String getNome() { return nome; }

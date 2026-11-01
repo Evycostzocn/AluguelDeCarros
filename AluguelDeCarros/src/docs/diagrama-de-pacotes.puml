@@ -27,7 +27,9 @@ package "Back-end — Spring Boot" {
     service ..> dto : transforma dados
 
     repository ..> model : persiste entidades
+    config ..> repository : verifica conta ativa
     config ..> service : configura autenticação
+    controller ..> config : sessão e CSRF
 }
 
 database "Supabase\nPostgreSQL" as database

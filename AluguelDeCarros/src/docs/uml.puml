@@ -55,6 +55,10 @@ class PedidoAluguel {
     - dataInicio: LocalDate
     - dataFim: LocalDate
     - status: StatusPedido
+    + alterar(automovel, inicio, fim): void
+    + cancelar(): void
+    + avaliar(aprovada): void
+    + contratar(): void
 }
 
 enum StatusPedido {
@@ -75,7 +79,7 @@ class AvaliacaoFinanceira {
 class ContratoAluguel {
     - id: Long
     - dataCelebracao: LocalDate
-    - valor: double
+    - valor: BigDecimal
 }
 
 class ContratoCredito {
@@ -87,6 +91,7 @@ class ContratoCredito {
 note left of Usuario
     Herança JPA JOINED.
     usuarios centraliza o login único.
+    agentes e clientes usam JOINED.
     clientes compartilha a PK de usuarios.
     Conta desativada por ativo = false.
 end note
@@ -95,6 +100,7 @@ note left of VinculoRenda
     Associação bidirecional LAZY.
     Coleção exposta somente para leitura.
     Até três vínculos pelos métodos do domínio.
+    Serviço bloqueia cliente durante alterações.
     orphanRemoval remove vínculos retirados.
 end note
 

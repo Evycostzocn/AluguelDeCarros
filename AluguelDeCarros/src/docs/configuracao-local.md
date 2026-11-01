@@ -51,10 +51,10 @@ bash ./mvnw clean verify
 bash ./mvnw spring-boot:run
 ```
 
-`verify` compila, executa os testes e empacota a aplicação. O teste existente
-`contextLoads`, com `@SpringBootTest`, carrega também a persistência e precisa
-das credenciais e do banco acessível. Não desative o teste nem configure um
-dialect manual para esconder falhas de conexão.
+`verify` compila, executa os testes e empacota a aplicação. Os testes de contexto
+e integração usam PostgreSQL 17 descartável via Testcontainers e exigem Docker
+acessível, sem usar DB_URL/DB_USERNAME/DB_PASSWORD do Supabase. Não desative os
+testes nem configure um dialect manual para esconder falhas de conexão.
 
 Nos logs, procure evidência de uma conexão PostgreSQL aberta pelo Hikari:
 
@@ -97,11 +97,11 @@ A primeira parte do domínio está em `com.example.AluguelDeCarros.model`:
 `Usuario` abstrato, `Cliente` e `VinculoRenda`. A herança é JOINED: `usuarios`
 centraliza ID identity, login único, hash e conta ativa; `clientes.id` é PK e FK
 para `usuarios.id`. CPF é String com exatamente 11 dígitos, sem pontuação;
-a validação de formato **não verifica os dígitos verificadores**. Os campos
-obrigatórios possuem Bean Validation e restrições SQL. Não há hashing nesta
-etapa: o construtor recebe somente um hash já produzido pela futura autenticação.
-O hash não tem getter e é ignorado pelo Jackson. Entidades não serão contratos
-HTTP; a futura API deverá usar DTOs.
+a anotação de formato da entidade não verifica dígitos verificadores, mas a
+camada de serviço da API normaliza e valida os dígitos. Os campos obrigatórios
+possuem Bean Validation e restrições SQL. O serviço de cadastro produz BCrypt;
+o construtor recebe somente o hash. Seu getter é restrito por `@JsonIgnore` na
+serialização. Entradas e saídas HTTP usam exclusivamente DTOs.
 
 `vinculos_renda` tem ID identity, FK obrigatória para clientes, empregador e
 rendimento `NUMERIC(15,2)` positivo (13 dígitos inteiros, duas casas decimais).
@@ -121,9 +121,9 @@ removido em outro cliente: crie outro, respeitando esse ciclo de vida.
 Não há equals/hashCode customizados ou comparação por IDs ainda não gerados.
 
 O limite de três é uma regra do domínio, complementada por `@Size(max=3)`;
-**não protege sozinho contra SQL direto ou transações concorrentes**. A futura
-camada transacional precisará coordenar alterações concorrentes (por exemplo,
-bloqueio do cliente); esta migração não implementa trigger de contagem.
+**não protege sozinho contra SQL direto ou transações concorrentes**. O serviço
+agora bloqueia o cliente com PESSIMISTIC_WRITE nas alterações de renda; não
+existe trigger de contagem para alterações externas ao back-end.
 `desativar()` muda `ativo` para false. Não há operação de exclusão física de
 clientes; JPA por si só não impede que código futuro execute uma remoção indevida.
 
@@ -146,23 +146,24 @@ Pare e investigue os objetos e o histórico, sem apagar dados nem habilitar
 baseline para contornar o conflito. Não se usa `IF NOT EXISTS` para ocultar
 incompatibilidades. A execução inicial cria estrutura persistente no banco.
 
-### Validação desta etapa
+### Validação local
 
-Sem credenciais, execute somente os testes independentes do banco:
+Sem Docker, é possível executar explicitamente apenas os testes unitários:
 
 ```bash
 bash ./mvnw -Dtest=ClienteTest,ValidacaoEntidadesTest test
 ```
 
 Esse comando seleciona explicitamente os testes unitários e não substitui a
-verificação completa. Com as três variáveis exportadas no mesmo terminal:
+verificação completa. Com Docker disponível, `clean verify` não requer Supabase.
+Para iniciar a aplicação real, exporte as três variáveis no mesmo terminal:
 
 ```bash
 bash ./mvnw clean verify
 bash ./mvnw spring-boot:run
 ```
 
-Verifique sucesso da migração V1 no log do Flyway, inicialização do
+Verifique sucesso das migrações V1 e V2 no log do Flyway, inicialização do
 EntityManagerFactory sem erros de schema e o resultado dos testes. No SQL Editor
 do Supabase, uma conferência somente leitura do histórico é:
 
@@ -172,7 +173,73 @@ FROM public.flyway_schema_history
 ORDER BY installed_rank;
 ```
 
-Na implementação desta etapa, as variáveis não estavam disponíveis no processo
-do assistente. A migração e a compatibilidade com o Supabase ainda precisam ser
-validadas com esses comandos, mesmo que a conexão da etapa anterior já tenha
-sido validada. Não compartilhe credenciais ou logs contendo segredos.
+## Back-end completo e dados de demonstração
+
+Consulte [api.md](api.md) para endpoints, payloads, sessão, CSRF e decisões de negócio.
+A migração incremental `V2__fluxo_aluguel.sql` cria agentes, automóveis, pedidos,
+avaliações e contratos. V1 foi preservada. `ddl-auto=validate`, Flyway clean
+desabilitado e baseline automático desabilitado permanecem configurados.
+
+Para testes completos (PostgreSQL descartável, incluindo V1 e V2):
+
+```bash
+docker info
+bash ./mvnw clean verify
+```
+
+O teste de contexto original também usa esse banco, sem enfraquecer a validação
+Hibernate. Não há H2 nem fallback silencioso. Testcontainers gerencia os seus
+próprios containers e os remove ao fim; bancos externos não são apagados.
+O SSL é desabilitado somente no datasource de teste para o PostgreSQL local
+sem TLS. Na aplicação Supabase, continua obrigatório.
+
+Para carregar demonstração, use apenas um banco de desenvolvimento e o perfil
+`dev`, com ativação adicional `app.dev.seed=true`. Informe senhas no terminal:
+
+```bash
+read -r -s -p 'Senha do agente empresa: ' DEV_EMPRESA_PASSWORD
+printf '\n'
+export DEV_EMPRESA_PASSWORD
+read -r -s -p 'Senha do agente banco: ' DEV_BANCO_PASSWORD
+printf '\n'
+export DEV_BANCO_PASSWORD
+bash ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.arguments=--app.dev.seed=true
+```
+
+A carga cria `demo.empresa`, `demo.banco` e automóveis DEMO-001/DEMO-002. É
+idempotente em execuções sequenciais: não duplica registros nem redefine senhas
+existentes. Uma colisão com perfil incompatível é erro, sem sobrescrever dados.
+Não execute a carga simultaneamente em múltiplas instâncias. No perfil padrão,
+nenhuma carga é executada. Senhas ficam somente em hashes BCrypt no banco;
+não são inseridas em migrações. Após a carga, retire as variáveis do ambiente:
+
+```bash
+unset DEV_EMPRESA_PASSWORD DEV_BANCO_PASSWORD
+```
+
+Os agentes de produção devem ser provisionados por um processo administrativo
+controlado com BCrypt; não há endpoint público para isso. Automóveis devem ser
+cadastrados previamente com exatamente um proprietário e IDs válidos.
+
+`FRONTEND_ORIGINS` configura as origens CORS (padrão `http://localhost:5173`).
+Para HTTPS, configure `SESSION_COOKIE_SECURE=true`. O padrão HTTP local usa
+cookie HttpOnly e SameSite=Lax. Configure o fuso do processo de maneira consistente
+para datas de auditoria (por exemplo `TZ=America/Sao_Paulo`).
+
+A execução de testes com Testcontainers não comprova aplicação das migrações
+no Supabase. Para validar o banco real, execute `spring-boot:run` com suas variáveis
+exportadas e confira Flyway e EntityManagerFactory. Não compartilhe credenciais
+ou logs contendo segredos.
+
+## Registro da verificação desta entrega
+
+- Compilação Java 25 executada com sucesso antes das correções finais.
+- V1 e V2 aplicadas em PostgreSQL 17 descartável, com validação Hibernate bem-sucedida.
+- Última suíte executada: 18 testes, 16 passaram, dois falharam, nenhum ignorado.
+- As falhas identificaram ID nulo na resposta de criação de vínculo e simulação
+  incompleta de cookie válido no teste de troca do ID de sessão. Ambas foram
+  corrigidas no código, mas a reexecução foi recusada na solicitação de permissão
+  para Maven/Docker fora do sandbox. A correção dos dois casos ainda não foi
+  confirmada por nova execução.
+- Execute `bash ./mvnw clean verify` para validar o estado final antes de integrar.
+- Supabase não foi acessado nesta entrega: as variáveis não estavam disponíveis.
