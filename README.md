@@ -21,7 +21,6 @@ com as seções aplicáveis ao sistema realmente implementado.
 - [Testes](#testes)
 - [Documentações utilizadas](#documentações-utilizadas)
 - [Autores](#autores)
-- [Contribuição](#contribuição)
 - [Agradecimentos](#agradecimentos)
 - [Licença](#licença)
 
@@ -247,9 +246,6 @@ Há carga opcional no perfil `dev`, ativada também por `app.dev.seed=true`, par
 variáveis de ambiente; nenhuma senha padrão é publicada. A carga não executa no
 perfil padrão. Consulte o guia local antes de usá-la em um banco de desenvolvimento.
 
-**A preencher após validação:** capturas reais das telas e, se exigido, vídeo de
-apresentação. Não há demonstração online ou evidências visuais anexadas.
-
 ## Testes
 
 Os testes existentes cobrem domínio, formato/validação, ocultação de hash e
@@ -266,20 +262,6 @@ Sem Docker, somente os testes unitários podem ser selecionados explicitamente:
 bash ./mvnw -Dtest=ClienteTest,ValidacaoEntidadesTest test
 ```
 
-Isso não substitui a suíte completa. Não há testes automatizados do front-end.
-
-| Evidência anterior nesta colaboração | Resultado registrado |
-|---|---|
-| Migrações V1/V2 em PostgreSQL 17 descartável | Aplicadas; Hibernate validou o schema |
-| Última suíte de back-end executada pelo assistente | 18 testes: 16 passaram, 2 falharam, nenhum ignorado |
-| Correções posteriores | ID de vínculo e simulação de cookie corrigidos; reexecução pendente |
-| Build do front-end após reorganização | Passou, 44 módulos transformados |
-| Supabase | Conexão anterior informada pela usuária; aplicação de V1/V2 não confirmada pelo assistente |
-| Integração manual e carga dev | Validação ainda pendente nesta colaboração |
-
-Esta revisão altera apenas documentação. Não foram executados testes, builds
-ou comandos de inicialização. Não há percentual de cobertura informado.
-
 ## Documentações utilizadas
 
 - [Template de README do enunciado](https://github.com/joaopauloaramuni/desenvolvimento-e-integracao-de-aplicacoes-web/blob/main/TEMPLATES/template_README.md).
@@ -290,28 +272,17 @@ ou comandos de inicialização. Não há percentual de cobertura informado.
 
 ## Autores
 
-**Preenchimento pendente pelos integrantes; nenhum nome foi presumido.**
-
 | Informação | Preencher |
 |---|---|
-| Integrante(s) | Nome completo, matrícula e perfil GitHub de cada integrante |
-| Instituição e curso | Nome oficial |
-| Turma e período letivo | Turma / semestre / ano |
-| Docente responsável | Confirmar nome; a autoria do template não identifica automaticamente o docente da turma |
-| Entrega | Data e identificação exigidas pelo enunciado |
-
-## Contribuição
-
-Preserve as migrações aplicadas; mudanças de banco exigem novas versões.
-Atualize requisitos e diagramas quando o comportamento mudar. Nunca versione
-segredos ou artefatos gerados. Registre correções e resultados reais antes de
-considerar uma entrega validada. As versões anteriores dos modelos permanecem
-nos commits Git; consulte o [histórico documentado](AluguelDeCarros/src/docs/historico-modelagem.md).
+| Integrante | [Evelyn Costa](https://github.com/Evycostzocn) |
+| Instituição e curso | PUC Minas - Engenharia de Software |
+| Período letivo | 2° perídodo/2026 |
+| Docente responsável | [João Paulo Aramuni](https://github.com/joaopauloaramuni) |
+| Entrega | 01/11/2026 |
 
 ## Agradecimentos
 
 Crédito ao Prof. João Paulo Aramuni pela disponibilização do template de README.
-Outros agradecimentos devem ser incluídos pelos integrantes, se pertinentes.
 
 ## Licença
 
