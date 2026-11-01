@@ -23,7 +23,9 @@ Critérios de aceitação:
 
 - O cadastro deve conter usuário, senha, RG, CPF, nome, endereço e profissão.
 - Não deve ser permitido cadastrar usuário ou CPF já existente.
-- A senha deve ser armazenada de forma protegida, utilizando hash.
+- A senha deve ser armazenada com BCrypt, sem retorno do hash na API.
+- CPF deve ser normalizado e ter formato e dígitos verificadores válidos.
+- O cadastro público cria somente CLIENTE; não aceita perfil de agente.
 
 ### HU02 — Autenticação
 
@@ -34,19 +36,22 @@ Critérios de aceitação:
 
 - Clientes e agentes devem conseguir realizar login.
 - Credenciais inválidas devem impedir o acesso.
-- As funcionalidades do sistema devem exigir autenticação.
+- Operações protegidas exigem sessão HTTP e autorização por perfil.
+- Contas desativadas não autenticam nem mantêm acesso por sessões anteriores.
+- Mutações exigem CSRF; a interface renova o token após login.
 - O usuário deve conseguir encerrar sua sessão.
 
 ### HU03 — Gerenciamento do cadastro do cliente
 
-Como cliente, quero consultar, atualizar e excluir meu cadastro
+Como cliente, quero consultar, atualizar e desativar meu cadastro
 para manter o controle sobre meus dados.
 
 Critérios de aceitação:
 
 - O cliente deve acessar somente seu próprio cadastro.
-- As alterações devem respeitar as validações do cadastro.
-- A exclusão deve desativar o acesso e preservar o histórico de pedidos
+- As alterações abrangem RG, CPF, nome, endereço e profissão; usuário, senha
+  e perfil não são editáveis nesta versão.
+- A desativação deve encerrar o acesso e preservar o histórico de pedidos
   e contratos.
 
 ### HU04 — Informações de renda
@@ -60,6 +65,8 @@ Critérios de aceitação:
 - Cada cliente pode possuir no máximo três vínculos cadastrados.
 - O rendimento informado deve ser maior que zero.
 - O cliente deve conseguir consultar, alterar e remover seus vínculos.
+- Alterações de renda pela API bloqueiam transacionalmente o cliente; o limite
+  não protege contra SQL externo que ignore as regras do sistema.
 
 ### HU05 — Criação de pedido
 
@@ -114,7 +121,8 @@ o atendimento e a análise das solicitações.
 
 Critérios de aceitação:
 
-- O agente deve conseguir consultar os pedidos disponíveis para análise.
+- Qualquer agente ativo pode consultar todos os pedidos e seus detalhes,
+  inclusive pedidos que já saíram da análise; não há carteira por agente.
 - O agente deve conseguir modificar os dados da solicitação enquanto
   o pedido estiver EM_ANALISE.
 - O agente não pode modificar o cliente responsável pelo pedido.
@@ -143,8 +151,9 @@ Critérios de aceitação:
 - Cada pedido pode possuir no máximo um contrato de aluguel.
 - O contrato deve registrar a data de celebração e o valor do aluguel.
 - O registro do contrato deve alterar o status do pedido para CONTRATADO.
-- A propriedade do automóvel deve ser identificada conforme o contrato,
-  podendo pertencer a um cliente, uma empresa ou um banco.
+- O automóvel do pedido possui exatamente um proprietário: cliente ou agente.
+- O contrato não copia nem transfere a propriedade; a referência continua no
+  automóvel. Não existe operação de transferência implementada.
 
 ### HU12 — Associação de contrato de crédito
 
@@ -153,16 +162,39 @@ de aluguel para registrar o financiamento concedido.
 
 Critérios de aceitação:
 
-- O contrato de crédito deve identificar o banco concedente.
+- O banco concedente é o agente BANCO autenticado, identificado pelo servidor.
 - O contrato de crédito deve registrar o valor e a quantidade de parcelas.
 - O valor e a quantidade de parcelas devem ser maiores que zero.
 - Um contrato de aluguel pode possuir no máximo um contrato de crédito.
 - A associação de crédito é opcional.
 
-## Regras e decisões iniciais
+### HU13 — Consulta de automóveis
+
+Como usuário autenticado, quero consultar os automóveis cadastrados para conhecer
+a frota; como cliente, quero selecionar um deles para criar um pedido.
+
+Critérios de aceitação:
+
+- Clientes e agentes podem consultar matrícula, ano, marca, modelo e placa.
+- Apenas clientes podem criar pedidos; agentes não fazem solicitações como cliente.
+- Não há CRUD público de frota nem garantia de disponibilidade por período.
+
+### HU14 — Consulta de contratos
+
+Como cliente, quero consultar o contrato do meu pedido e o crédito associado;
+como agente, quero consultar contratos para acompanhar a formalização.
+
+Critérios de aceitação:
+
+- Cliente acessa somente contratos dos próprios pedidos; agentes ativos acessam todos.
+- A consulta mostra data, valor, responsável e crédito, quando existente.
+- Não há edição ou exclusão de contratos pela API.
+
+## Decisões implementadas e limites
 
 As decisões abaixo complementam pontos que o enunciado não detalha.
-Elas devem ser validadas com o professor e atualizadas quando necessário.
+Representam o código atual; a aderência acadêmica final deve ser confirmada com
+o docente. Histórias documentam comportamento, não comprovam aprovação em testes.
 
 - O cadastro público será destinado a clientes.
 - As contas de agentes serão cadastradas previamente, sem permitir
@@ -178,12 +210,18 @@ Elas devem ser validadas com o professor e atualizadas quando necessário.
   distinto da placa.
 - Cada automóvel terá um único proprietário por vez: um cliente ou um agente.
 - A propriedade não será transferida automaticamente apenas pela aprovação
-  do pedido; seu registro deverá seguir o contrato.
+  do pedido ou pelo registro de contrato; não há fluxo de transferência.
 
-## Fluxo inicial dos pedidos
+## Fluxo dos pedidos
 
 - Criação: EM_ANALISE.
 - Avaliação positiva: APROVADO.
 - Avaliação negativa: REPROVADO.
 - Cancelamento permitido: CANCELADO.
 - Registro de contrato: CONTRATADO.
+
+## Rastreabilidade
+
+Os casos de uso referenciam os mesmos IDs HU. Rotas e payloads estão em
+[api.md](api.md). A evolução anterior está preservada no
+[histórico Git dos modelos](historico-modelagem.md).

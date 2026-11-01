@@ -1,0 +1,14 @@
+import React, { useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Link, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { AuthPage, AuthProvider, Protected, useAuth } from './auth';
+import { CarsPage, ContractPage, OrderPage, OrdersPage, ProfilePage } from './pages';
+import { Notice, profiles } from './ui';
+import './style.css';
+function Layout() {
+  const auth = useAuth(), [busy, setBusy] = useState(false), [error, setError] = useState(''), location = useLocation();
+  async function logout() { setBusy(true); setError(''); try { await auth.logout(); } catch(e) { setError(e.message); } finally { setBusy(false); } }
+  return <div className="app-shell"><aside className="sidebar"><Link className="brand" to="/pedidos"><span className="brand-mark">r.</span> rota</Link><p className="nav-caption">SEU ESPAÇO</p><nav aria-label="Navegação principal"><NavLink to="/pedidos"><span aria-hidden="true">▤</span> {auth.user.perfil === 'CLIENTE' ? 'Meus pedidos' : 'Pedidos'}</NavLink><NavLink to="/automoveis"><span aria-hidden="true">↗</span> Automóveis</NavLink>{auth.user.perfil === 'CLIENTE' && <NavLink to="/cadastro-pessoal"><span aria-hidden="true">◉</span> Meu cadastro</NavLink>}</nav><div className="sidebar-bottom"><span className="avatar">{auth.user.usuario.slice(0, 1).toUpperCase()}</span><div className="user-info"><strong>{auth.user.usuario}</strong><small>{profiles[auth.user.perfil]}</small></div><button className="logout" disabled={busy} onClick={logout}>{busy ? 'Saindo…' : 'Sair'}</button></div></aside><div className="workspace"><div className="topbar"><span>Aluguel de carros</span><span className="topbar-dot"/> <span>{profiles[auth.user.perfil]}</span></div><main id="conteudo"><Notice error={error}/><div key={location.pathname}><Outlet/></div></main><footer>Rota · Sistema de aluguel de carros</footer></div></div>;
+}
+function App() { return <BrowserRouter><AuthProvider><a href="#conteudo" className="skip-link">Pular para o conteúdo</a><Routes><Route path="/login" element={<AuthPage/>}/><Route path="/cadastro" element={<AuthPage register/>}/><Route element={<Protected roles={['CLIENTE', 'EMPRESA', 'BANCO']}/>}><Route element={<Layout/>}><Route path="/" element={<Navigate to="/pedidos" replace/>}/><Route path="/pedidos" element={<OrdersPage/>}/><Route path="/pedidos/:id" element={<OrderPage/>}/><Route path="/contratos/:id" element={<ContractPage/>}/><Route path="/automoveis" element={<CarsPage/>}/><Route element={<Protected roles={['CLIENTE']}/>}><Route path="/cadastro-pessoal" element={<ProfilePage/>}/></Route><Route path="*" element={<div className="empty"><h1>Página não encontrada</h1><Link to="/pedidos">Voltar aos pedidos</Link></div>}/></Route></Route></Routes></AuthProvider></BrowserRouter>; }
+createRoot(document.getElementById('root')).render(<App/>);

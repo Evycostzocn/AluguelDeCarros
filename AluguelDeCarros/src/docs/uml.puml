@@ -2,6 +2,12 @@
 top to bottom direction
 skinparam classAttributeIconSize 0
 
+legend top left
+  Modelo do código JPA atual.
+  Getters e construtores omitidos para legibilidade.
+  Setas indicam navegação das associações implementadas.
+endlegend
+
 abstract class Usuario {
     - id: Long
     - usuario: String
@@ -17,6 +23,7 @@ class Cliente {
     - endereco: String
     - profissao: String
     - vinculosRenda: List<VinculoRenda>
+    + atualizar(rg: String, cpf: String, nome: String, endereco: String, profissao: String): void
     + adicionarVinculoRenda(vinculo: VinculoRenda): void
     + removerVinculoRenda(vinculo: VinculoRenda): void
     + getVinculosRenda(): List<VinculoRenda>
@@ -38,6 +45,9 @@ class VinculoRenda {
     - entidadeEmpregadora: String
     - rendimento: BigDecimal
     - cliente: Cliente
+    + atualizar(entidadeEmpregadora: String, rendimento: BigDecimal): void
+    ~ associarA(cliente: Cliente): void
+    ~ desassociarDe(cliente: Cliente): void
 }
 
 class Automovel {
@@ -47,6 +57,8 @@ class Automovel {
     - marca: String
     - modelo: String
     - placa: String
+    - proprietarioCliente: Cliente
+    - proprietarioAgente: Agente
 }
 
 class PedidoAluguel {
@@ -55,9 +67,11 @@ class PedidoAluguel {
     - dataInicio: LocalDate
     - dataFim: LocalDate
     - status: StatusPedido
-    + alterar(automovel, inicio, fim): void
+    - cliente: Cliente
+    - automovel: Automovel
+    + alterar(automovel: Automovel, inicio: LocalDate, fim: LocalDate): void
     + cancelar(): void
-    + avaliar(aprovada): void
+    + avaliar(aprovada: boolean): void
     + contratar(): void
 }
 
@@ -74,10 +88,14 @@ class AvaliacaoFinanceira {
     - dataAvaliacao: LocalDateTime
     - parecer: String
     - aprovada: boolean
+    - pedido: PedidoAluguel
+    - agente: Agente
 }
 
 class ContratoAluguel {
     - id: Long
+    - pedido: PedidoAluguel
+    - agente: Agente
     - dataCelebracao: LocalDate
     - valor: BigDecimal
 }
@@ -86,13 +104,15 @@ class ContratoCredito {
     - id: Long
     - valor: BigDecimal
     - quantidadeParcelas: Integer
+    - contrato: ContratoAluguel
+    - banco: Agente
 }
 
 note left of Usuario
     Herança JPA JOINED.
     usuarios centraliza o login único.
     agentes e clientes usam JOINED.
-    clientes compartilha a PK de usuarios.
+    clientes e agentes compartilham a PK de usuarios.
     Conta desativada por ativo = false.
 end note
 
@@ -111,20 +131,20 @@ Agente --> TipoAgente
 PedidoAluguel --> StatusPedido
 
 Cliente "1" *-- "0..3" VinculoRenda : possui
-Cliente "1" -- "0..*" PedidoAluguel : solicita
-Automovel "1" -- "0..*" PedidoAluguel : solicitado em
+PedidoAluguel "0..*" --> "1" Cliente : cliente
+PedidoAluguel "0..*" --> "1" Automovel : automovel
 
-PedidoAluguel "1" -- "0..1" AvaliacaoFinanceira : recebe
-Agente "1" -- "0..*" AvaliacaoFinanceira : realiza
+AvaliacaoFinanceira "0..1" --> "1" PedidoAluguel : pedido
+AvaliacaoFinanceira "0..*" --> "1" Agente : agente
 
-PedidoAluguel "1" -- "0..1" ContratoAluguel : origina
-Agente "1" -- "0..*" ContratoAluguel : registra
+ContratoAluguel "0..1" --> "1" PedidoAluguel : pedido
+ContratoAluguel "0..*" --> "1" Agente : agente
 
-ContratoAluguel "1" -- "0..1" ContratoCredito : pode possuir
-Agente "1" -- "0..*" ContratoCredito : concede
+ContratoCredito "0..1" --> "1" ContratoAluguel : contrato
+ContratoCredito "0..*" --> "1" Agente : banco
 
-Cliente "0..1" -- "0..*" Automovel : proprietário
-Agente "0..1" -- "0..*" Automovel : proprietário
+Automovel "0..*" --> "0..1" Cliente : proprietarioCliente
+Automovel "0..*" --> "0..1" Agente : proprietarioAgente
 
 note right of Agente
     Representa a conta de uma empresa
@@ -134,7 +154,8 @@ end note
 note right of Automovel
     Cada automóvel deve possuir exatamente
     um proprietário: Cliente ou Agente.
-    As duas associações são exclusivas.
+    As duas associações são exclusivas (CHECK SQL).
+    Contratos não transferem nem copiam propriedade.
 end note
 
 note right of PedidoAluguel
@@ -148,6 +169,8 @@ end note
 note right of ContratoCredito
     O agente concedente deve
     possuir o tipo BANCO.
+    Identificado pela sessão, não pelo payload.
+    Valores monetários: NUMERIC(15,2).
 end note
 
 @enduml

@@ -2,16 +2,26 @@
 top to bottom direction
 skinparam packageStyle rectangle
 
-package "Front-end — React + Vite" {
-    package "pages" as pages
-    package "components" as components
-    package "services — cliente HTTP" as frontendServices
-
-    pages ..> components : utiliza
-    pages ..> frontendServices : solicita operações
+package "AluguelDeCarros/frontend/src" {
+    artifact "main.jsx\nRotas e layout" as main
+    artifact "pages.jsx\nTelas de negócio" as pages
+    artifact "auth.jsx\nSessão e proteção de rotas" as auth
+    artifact "ui.jsx\nComponentes e hooks" as ui
+    artifact "api.js\nCliente HTTP e CSRF" as api
+    artifact "style.css" as css
+    main ..> pages
+    main ..> auth
+    main ..> ui
+    main ..> css
+    pages ..> auth
+    pages ..> ui
+    pages ..> api
+    auth ..> api
+    auth ..> ui
+    ui ..> api : useResource
 }
 
-package "Back-end — Spring Boot" {
+package "com.example.AluguelDeCarros" {
     package "controller" as controller
     package "service" as service
     package "repository" as repository
@@ -19,39 +29,44 @@ package "Back-end — Spring Boot" {
     package "dto" as dto
     package "config" as config
 
-    controller ..> service : delega operações
-    controller ..> dto : recebe e retorna dados
-
-    service ..> repository : consulta e persiste
-    service ..> model : aplica regras
+    controller ..> service : delega regras
+    controller ..> dto : entradas e saídas
+    service ..> repository : consulta / persiste / bloqueia
+    service ..> model : regras de domínio
     service ..> dto : transforma dados
-
-    repository ..> model : persiste entidades
-    config ..> repository : verifica conta ativa
-    config ..> service : configura autenticação
-    controller ..> config : sessão e CSRF
+    repository ..> model : entidades JPA
+    dto ..> model : StatusPedido na resposta
+    config ..> repository : usuário ativo / carga dev
+    config ..> model : perfis / carga dev
+    config ..> service : identificação de perfil
 }
 
-database "Supabase\nPostgreSQL" as database
+package "Spring Security" {
+    component "Filtros de segurança\nSessão, autorização, CSRF e logout" as security
+}
+artifact "src/main/resources/db/migration\nV1 e V2 — Flyway" as migration
+database "Supabase / PostgreSQL\nschema public" as database
+api ..> security : HTTP / JSON + cookie + CSRF
+security ..> controller : requisições autorizadas
+config ..> security : configura filtros e beans
+controller ..> security : login programático / contexto
+repository ..> database : JPA / JDBC
+migration ..> database : estrutura versionada
 
-frontendServices ..> controller : HTTP / JSON
-repository ..> database : acesso aos dados
-
-note bottom of controller
-    Controller: recebe requisições HTTP.
-    Service: executa regras de negócio.
-    Repository: acessa o banco de dados.
-    Model: representa entidades do domínio.
-    DTO: define os dados de entrada e saída.
-    Config: reúne configurações da aplicação.
+note bottom of main
+    Os itens do front-end são arquivos reais,
+    não pastas pages/components/services.
+    Vite encaminha /api a localhost:8080.
 end note
-
-note bottom of pages
-    O React representa a camada
-    de apresentação da aplicação.
-
-    O back-end expõe os dados
-    por uma API REST.
+note bottom of service
+    ClienteService: cadastro e renda.
+    IdentidadeService: usuário e perfil.
+    AluguelService: pedidos, avaliação e contratos.
+    Transações e bloqueios protegem mutações.
 end note
-
+note bottom of migration
+    Flyway aplica migrações;
+    Hibernate valida (ddl-auto=validate).
+    Schema auth do Supabase não é alterado.
+end note
 @enduml
